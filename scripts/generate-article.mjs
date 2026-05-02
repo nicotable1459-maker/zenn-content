@@ -119,7 +119,17 @@ published: true
   }
   console.log(" 完了！");
 
-  return fullContent;
+  return stripMarkdownWrapper(fullContent);
+}
+
+// AIが ```markdown ... ``` で出力をラップした場合に除去する
+function stripMarkdownWrapper(content) {
+  let s = content.trim();
+  // 先頭の ```markdown または ``` を除去
+  s = s.replace(/^```(?:markdown)?\n/, "");
+  // 末尾の ``` を除去
+  s = s.replace(/\n```\s*$/, "");
+  return s.trim();
 }
 
 // frontmatterのslugフィールドを挿入または上書きする
