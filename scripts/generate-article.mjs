@@ -25,20 +25,20 @@ if (!apiKey) {
   process.exit(1);
 }
 
-// 記事生成の対象ジャンル一覧
+// 記事生成の対象ジャンル一覧（英語スラッグプレフィックス付き）
 const GENRES = [
-  "AI活用術",
-  "仕事効率化",
-  "お金と副業",
-  "住宅と不動産",
-  "時事解説",
-  "思考とマインド",
+  { label: "AI活用術",    prefix: "ai-tips"       },
+  { label: "仕事効率化",  prefix: "work-hack"     },
+  { label: "お金と副業",  prefix: "money-side"    },
+  { label: "住宅と不動産", prefix: "housing"      },
+  { label: "時事解説",    prefix: "news-analysis" },
+  { label: "思考とマインド", prefix: "mindset"    },
 ];
 
 // ジャンルをランダムに1つ選ぶ
 function pickRandomGenre() {
   const index = Math.floor(Math.random() * GENRES.length);
-  return GENRES[index];
+  return GENRES[index]; // { label, prefix }
 }
 
 // 日付文字列を YYYYMMDD 形式で返す
@@ -50,19 +50,21 @@ function getTodayString() {
   return `${y}${m}${d}`;
 }
 
-// タイトルからファイル名用スラッグを生成（日本語はそのまま使用）
-function titleToSlug(title) {
-  return title
-    .replace(/[\\/:*?"<>|]/g, "") // ファイル名に使えない文字を除去
-    .replace(/\s+/g, "_")
-    .slice(0, 50); // 長すぎる場合は切り詰め
+// ジャンルプレフィックス + ランダム英数字でスラッグを生成
+// 例: "ai-tips-a3f9k2"
+function buildSlug(prefix) {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const rand = Array.from({ length: 6 }, () =>
+    chars[Math.floor(Math.random() * chars.length)]
+  ).join("");
+  return `${prefix}-${rand}`;
 }
 
 // Anthropic APIを使って記事を生成する
 async function generateArticle(genre) {
   const client = new Anthropic({ apiKey });
 
-  console.log(`\n📝 ジャンル「${genre}」の記事を生成中...`);
+  console.log(`\n📝 ジャンル「${genre.label}」の記事を生成中...`);
 
   const systemPrompt = `あなたはZennで人気の技術・ライフスタイル系ライターです。
 読者に価値ある情報を分かりやすく伝える、質の高い記事を書いてください。
@@ -70,7 +72,7 @@ async function generateArticle(genre) {
 
   const userPrompt = `以下の条件でZenn記事を生成してください。
 
-【ジャンル】${genre}
+【ジャンル】${genre.label}
 
 【要件】
 - frontmatterを必ず含める（title, emoji, type: "tech"または"idea", topics, published: true）
@@ -120,30 +122,34 @@ published: true
   return fullContent;
 }
 
-// frontmatterからタイトルを抽出する
-function extractTitle(markdown) {
-  const match = markdown.match(/^---[\s\S]*?title:\s*["']?(.+?)["']?\s*\n/m);
-  if (match) {
-    return match[1].trim();
+// frontmatterのslugフィールドを挿入または上書きする
+// AIが生成したfrontmatterにslugが含まれていても強制的に置き換える
+function injectSlug(markdown, slug) {
+  // frontmatter内にすでにslugがあれば置換
+  if (/^slug:/m.test(markdown)) {
+    return markdown.replace(/^slug:.+$/m, `slug: "${slug}"`);
   }
-  // frontmatterにタイトルがない場合は最初のH1を探す
-  const h1Match = markdown.match(/^#\s+(.+)/m);
-  if (h1Match) {
-    return h1Match[1].trim();
+  // なければ published: true の直前に挿入
+  if (/^published:/m.test(markdown)) {
+    return markdown.replace(/^(published:)/m, `slug: "${slug}"\n$1`);
   }
-  return "generated-article";
+  // どちらもなければfrontmatter終端 "---" の直前に挿入
+  return markdown.replace(/^---\s*$/m, `slug: "${slug}"\n---`);
 }
 
-// 記事をファイルに保存する
+// 記事をファイルに保存する（slugをファイル名とfrontmatterに反映）
 function saveArticle(content, genre) {
   const date = getTodayString();
-  const title = extractTitle(content);
-  const slug = titleToSlug(title);
-  const filename = `${date}_${slug}.md`;
+  const slug = buildSlug(genre.prefix);       // 例: "mindset-a3f9k2"
+  const filename = `${date}_${slug}.md`;      // 例: "20260503_mindset-a3f9k2.md"
+
+  // frontmatterにslugを注入してからファイルに書き込む
+  const finalContent = injectSlug(content, slug);
   const filepath = path.join(PROJECT_ROOT, "articles", filename);
 
-  fs.writeFileSync(filepath, content, "utf-8");
+  fs.writeFileSync(filepath, finalContent, "utf-8");
   console.log(`\n✅ 記事を保存しました: articles/${filename}`);
+  console.log(`   slug: ${slug}`);
   return filepath;
 }
 
@@ -181,7 +187,7 @@ async function main() {
 
   // ランダムにジャンルを選択
   const genre = pickRandomGenre();
-  console.log(`🎲 選択されたジャンル: ${genre}`);
+  console.log(`🎲 選択されたジャンル: ${genre.label} (prefix: ${genre.prefix})`);
 
   // 記事を生成
   const content = await generateArticle(genre);
