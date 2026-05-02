@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(claude-api)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(node scripts/generate-article.mjs --help)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(node scripts/generate-article.mjs)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
+    ]
+  }
+}
