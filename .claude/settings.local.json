@@ -10,7 +10,10 @@
       "Bash(git config *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Read(//c/Users/user/Desktop/MoneyProject/**)",
+      "Read(//c/Users/user/Desktop/MoneyProject/scripts/**)",
+      "Bash(node --env-file=.env scripts/generate-tweet.mjs)"
     ]
   }
 }
